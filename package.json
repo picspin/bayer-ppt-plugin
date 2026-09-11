@@ -1,0 +1,27 @@
+{
+  "name": "bayer-ppt-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cursor/Claude skills marketplace package for Bayer-branded PPT workflows (brand kit + infographic-creator + ppt-master peer bridge)",
+  "keywords": [
+    "skills",
+    "bayer",
+    "powerpoint",
+    "pptx",
+    "claude",
+    "cursor",
+    "infographic",
+    "ppt-master"
+  ],
+  "license": "UNLICENSED",
+  "files": [
+    ".claude-plugin",
+    "skills",
+    "brand-kit",
+    "brand-assets",
+    "deps",
+    "examples",
+    "AGENTS.md",
+    "README.md"
+  ]
+}

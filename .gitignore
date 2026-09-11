@@ -1,0 +1,35 @@
+# Proprietary Bayer binaries (drop-in locally; never commit)
+brand-assets/source/*
+!brand-assets/source/README.md
+!brand-assets/source/.gitkeep
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Working masters / exports / rebuild artifacts
+exports/
+*.pptx
+*.potx
+*.pdf
+!docs/**/*.pdf
+
+# Node
+node_modules/
+dist/
+*.tgz
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Local agent scratch
+.tmp/
+.cache/

@@ -1,0 +1,401 @@
+{
+  "name": "Bayer",
+  "product_lines_noted": [
+    "Bayer corporate (Color Guide)",
+    "Business Consulting Chart Library",
+    "Bayer Pharmaceuticals",
+    "Bayer Crop Science",
+    "Bayer Animal Health",
+    "Bayer in Radiology",
+    "Bayer Chart Pool (corporate 16:9 template)"
+  ],
+  "colors": {
+    "primary": "#10384F",
+    "primary_name": "Bayer Dark Blue",
+    "secondary": [
+      "#0091DF",
+      "#00BCFF",
+      "#00617F"
+    ],
+    "secondary_names": [
+      "Bayer Blue",
+      "Bayer Bright Blue",
+      "Bayer Mid Blue"
+    ],
+    "accent": [
+      "#89D329",
+      "#66B512",
+      "#FF3162",
+      "#D30F4B"
+    ],
+    "accent_names": [
+      "Bayer Bright Green",
+      "Bayer Green",
+      "Bayer Fuchsia",
+      "Bayer Raspberry"
+    ],
+    "neutral": [
+      "#FFFFFF",
+      "#000000",
+      "#624963",
+      "#443247",
+      "#2B6636",
+      "#004422"
+    ],
+    "neutral_names": [
+      "White",
+      "Black (theme dk1)",
+      "Bayer Mid Purple",
+      "Bayer Dark Purple",
+      "Bayer Mid Green",
+      "Bayer Dark Green"
+    ],
+    "background": [
+      "#FFFFFF",
+      "#10384F",
+      "#004422",
+      "#443247"
+    ],
+    "text": [
+      "#10384F",
+      "#000000",
+      "#FFFFFF"
+    ],
+    "full_palette": {
+      "Bayer Bright Blue": {
+        "hex": "#00BCFF",
+        "rgb": [
+          0,
+          188,
+          255
+        ],
+        "cmyk": [
+          71,
+          0,
+          0,
+          0
+        ],
+        "pantone": "298C"
+      },
+      "Bayer Blue": {
+        "hex": "#0091DF",
+        "rgb": [
+          0,
+          145,
+          223
+        ],
+        "cmyk": [
+          93,
+          17,
+          6,
+          0
+        ],
+        "pantone": "2192C"
+      },
+      "Bayer Mid Blue": {
+        "hex": "#00617F",
+        "rgb": [
+          0,
+          97,
+          127
+        ],
+        "cmyk": [
+          84,
+          32,
+          13,
+          22
+        ],
+        "pantone": "2152C"
+      },
+      "Bayer Dark Blue": {
+        "hex": "#10384F",
+        "rgb": [
+          16,
+          56,
+          79
+        ],
+        "cmyk": [
+          80,
+          33,
+          0,
+          80
+        ],
+        "pantone": "2380C"
+      },
+      "Bayer Bright Green": {
+        "hex": "#89D329",
+        "rgb": [
+          137,
+          211,
+          41
+        ],
+        "cmyk": [
+          40,
+          0,
+          100,
+          0
+        ],
+        "pantone": "2299C"
+      },
+      "Bayer Green": {
+        "hex": "#66B512",
+        "rgb": [
+          102,
+          181,
+          18
+        ],
+        "cmyk": [
+          57,
+          0,
+          100,
+          0
+        ],
+        "pantone": "376C"
+      },
+      "Bayer Mid Green": {
+        "hex": "#2B6636",
+        "rgb": [
+          43,
+          102,
+          54
+        ],
+        "cmyk": [
+          71,
+          5,
+          92,
+          45
+        ],
+        "pantone": "7742C"
+      },
+      "Bayer Dark Green": {
+        "hex": "#004422",
+        "rgb": [
+          0,
+          68,
+          34
+        ],
+        "cmyk": [
+          82,
+          30,
+          65,
+          76
+        ],
+        "pantone": "553C"
+      },
+      "Bayer Fuchsia": {
+        "hex": "#FF3162",
+        "rgb": [
+          255,
+          49,
+          98
+        ],
+        "cmyk": [
+          0,
+          88,
+          62,
+          0
+        ],
+        "pantone": "1785C"
+      },
+      "Bayer Raspberry": {
+        "hex": "#D30F4B",
+        "rgb": [
+          211,
+          15,
+          75
+        ],
+        "cmyk": [
+          0,
+          100,
+          55,
+          0
+        ],
+        "pantone": "1925C"
+      },
+      "Bayer Mid Purple": {
+        "hex": "#624963",
+        "rgb": [
+          98,
+          73,
+          99
+        ],
+        "cmyk": [
+          36,
+          68,
+          24,
+          31
+        ],
+        "pantone": "5135C"
+      },
+      "Bayer Dark Purple": {
+        "hex": "#443247",
+        "rgb": [
+          68,
+          50,
+          71
+        ],
+        "cmyk": [
+          55,
+          88,
+          32,
+          63
+        ],
+        "pantone": "518C"
+      },
+      "White": {
+        "hex": "#FFFFFF"
+      }
+    },
+    "theme_scheme_bayer_2017": {
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#FF3162",
+      "lt2": "#624963",
+      "accent1": "#10384F",
+      "accent2": "#00BCFF",
+      "accent3": "#004422",
+      "accent4": "#89D329",
+      "accent5": "#443247",
+      "accent6": "#D30F4B",
+      "hlink": "#00BCFF",
+      "folHlink": "#89D329"
+    },
+    "radiology_product_accents": {
+      "MEDRAD / Devices and Accessories": "#E46C0A",
+      "Radimetrics": "#2C5697",
+      "Equipment Service / Urografin": "#6BC200",
+      "Ultravist": "#0095C0",
+      "Gadovist": "#BD197A",
+      "Primovist / Biliscopin": "#DA2B3E",
+      "Traffic Light Red": "#CC0000",
+      "Traffic Light Yellow": "#FFCC00",
+      "Traffic Light Green": "#66B512"
+    },
+    "notes": "HEX/RGB/CMYK for the 12 brand colors taken from Color Guide PDF. Black is theme-only. Chart Library theme MidGreen custClr #2B6640 differs from Color Guide #2B6636 — Color Guide wins."
+  },
+  "fonts": {
+    "major": "Arial",
+    "minor": "Arial",
+    "ea": "Arial Unicode MS",
+    "cs": "Arial",
+    "theme_font_scheme": "Arial",
+    "icon_symbol_font_seen": "BayerSymbolsIconsPositive",
+    "notes": "No alternate corporate display font in Color Guide, Chart Library, Radiology POTX, or Official Chart Pool; Arial (+ Arial Unicode MS ea) from Bayer 2017 / Chart Pool themes. Official masters include German placeholder strings (locale remnant)."
+  },
+  "slide_size": {
+    "width_emu": 12190413,
+    "height_emu": 6858000,
+    "width_inches": 13.3316,
+    "height_inches": 7.5,
+    "ratio": "16:9"
+  },
+  "antv_theme": {
+    "palette": [
+      "#10384F",
+      "#0091DF",
+      "#00BCFF",
+      "#66B512",
+      "#89D329",
+      "#D30F4B",
+      "#FF3162",
+      "#624963",
+      "#00617F",
+      "#2B6636",
+      "#004422",
+      "#443247"
+    ],
+    "notes": "Lead with Dark Blue; Bright Blue/Green for highlights; Raspberry/Fuchsia for alerts; Mid/Dark for structure. Opacity 20–80% for tints per Color Guide overview; solid fills OK at 100%."
+  },
+  "ppt_master_hints": {
+    "default_text_color": "#10384F",
+    "default_background": "#FFFFFF",
+    "title_bar_dark": "#10384F",
+    "icon_default_color": "#10384F",
+    "icon_accent_default_radiology": "#E46C0A",
+    "icon_style": "outline",
+    "icon_stroke_viewbox_256": 8,
+    "prefer_layouts": [
+      "Title slide",
+      "Agenda",
+      "Title only",
+      "Chapter",
+      "Final Slide",
+      "Title Slide",
+      "Title slide 2",
+      "Title slide 3",
+      "Titelfolie",
+      "Content",
+      "内容",
+      "Content (2)",
+      "Text (4)",
+      "Text (2) & Images (2)",
+      "Quote",
+      "Image",
+      "Image color",
+      "Text & Image",
+      "Text & Image transparent",
+      "Final Slide 2",
+      "Final Slide 3",
+      "Title only (color)"
+    ],
+    "infographic_families": [
+      "list-*",
+      "sequence-*",
+      "compare-*",
+      "hierarchy-*",
+      "relation-*",
+      "chart-*"
+    ],
+    "avoid": [
+      "non-Bayer HEX inventing",
+      "recoloring Dark Blue icon strokes",
+      "icons replacing headlines",
+      "opacity outside 20-80% for decorative tints without reason",
+      "using 3D character JPEGs as default icons",
+      "inventing HEX outside Color Guide 12 + white (+ documented traffic-light / product accents when scoped)",
+      "treating Chart Pool agenda slide numbers as indices into this 330-slide file"
+    ],
+    "official_template_preferred": [
+      "Title only (color)",
+      "Agenda",
+      "Content",
+      "Text (4)",
+      "Chapter",
+      "Quote",
+      "Text & Image",
+      "Final Slide"
+    ],
+    "official_template_pattern_families": [
+      "butterfly-compare",
+      "circular-shapes-cycle",
+      "spheres-hierarchy",
+      "native-excel-charts",
+      "maps-globes",
+      "pm-toolbox-overlap-with-bc"
+    ]
+  },
+  "sources": {
+    "color_guide_pdf": "source/color-system.pdf",
+    "structured_graphics_pptx": "source/structured-graphics.pptx",
+    "icon_language_potx": "source/icon-language.potx",
+    "official_template": "source/official-template.pptx",
+    "notes": "Color Guide PDF wins for the 12 brand HEX values. Official Chart Pool (Aug 2019) custClr MidGreen #2B6636 matches Color Guide (BC Chart Library MidGreen custClr #2B6640 drifted). Traffic-light custClr are status semantics, not brand hues."
+  },
+  "official_template_theme": {
+    "theme_names": [
+      "PR_BAG_PPT-master_16-9",
+      "PR_BG_Chart-Pool_16-9_2019-08-27"
+    ],
+    "clrScheme": "Bayer 2017",
+    "fontScheme": "Arial",
+    "custClr_midgreen": "#2B6636",
+    "custClr_matches_color_guide": true,
+    "traffic_lights": {
+      "TrafficLightRed": "#CC0000",
+      "TrafficLightYellow": "#FFCC00",
+      "TrafficLightGreen": "#66B512"
+    },
+    "slide_count_this_copy": 330,
+    "stated_title": "Bayer Chart pool / Bayer 16:9 Template Chart Pool /// August 2019"
+  }
+}

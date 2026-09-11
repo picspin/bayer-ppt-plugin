@@ -1,0 +1,25 @@
+{
+  "$schema": "https://code.claude.com/schemas/marketplace.json",
+  "name": "bayer-ppt",
+  "owner": {
+    "name": "Bayer-ppt contributors"
+  },
+  "metadata": {
+    "description": "Bayer brand presentation skills: brand kit, Centargo/Radiology master rules, AntV infographic creator, and ppt-master peer bridge",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "bayer-ppt",
+      "description": "Bayer / company deck skill with Color Guide, Chart Pool, BC Chart Library, and Radiology Icon Library master rules (Centargo layouts)",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/bayer-ppt",
+        "./skills/infographic-creator",
+        "./skills/ppt-master",
+        "./skills/ppt-master-bridge"
+      ]
+    }
+  ]
+}
