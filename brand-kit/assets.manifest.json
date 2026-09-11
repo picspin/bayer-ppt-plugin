@@ -1,0 +1,127 @@
+{
+  "version": 1,
+  "description": "Machine-readable catalog of Bayer-ppt assets. Proprietary binaries are optional; brand-kit specs are required.",
+  "assets": [
+    {
+      "id": "color-guide",
+      "kind": "pdf",
+      "rel": "brand-assets/source/color-system.pdf",
+      "filenames": ["color-system.pdf", "Bayer_Color_Guide.pdf", "color-guide.pdf"],
+      "required_for": ["authoritative-color"],
+      "optional": true,
+      "description": "Bayer Color Guide PDF (proprietary)"
+    },
+    {
+      "id": "icon-library-potx",
+      "kind": "potx",
+      "rel": "brand-assets/source/icon-language.potx",
+      "filenames": [
+        "icon-language.potx",
+        "ALL.AA.Illustrative_Elements.Icon_Library_Overview.potx"
+      ],
+      "required_for": ["radiology-master", "centargo"],
+      "optional": true,
+      "description": "Radiology Icon Library POTX — primary slide-master backbone"
+    },
+    {
+      "id": "chart-pool",
+      "kind": "pptx",
+      "rel": "brand-assets/source/official-template.pptx",
+      "filenames": ["official-template.pptx", "Bayer_Chart_Pool.pptx", "chart-pool.pptx"],
+      "required_for": ["chart-pool-layouts"],
+      "optional": true,
+      "description": "Bayer 16:9 Chart Pool (Updated) PPTX"
+    },
+    {
+      "id": "bc-chart-library",
+      "kind": "pptx",
+      "rel": "brand-assets/source/structured-graphics.pptx",
+      "filenames": ["structured-graphics.pptx", "BC_Chart_Library.pptx", "bc-chart-library.pptx"],
+      "required_for": ["consulting-frameworks"],
+      "optional": true,
+      "description": "BC Chart Library PPTX"
+    },
+    {
+      "id": "theme",
+      "kind": "json",
+      "rel": "brand-kit/THEME.json",
+      "filenames": ["THEME.json"],
+      "required_for": ["brand-kit"],
+      "optional": false,
+      "description": "Palette, fonts, slide size, AntV theme"
+    },
+    {
+      "id": "brand-md",
+      "kind": "md",
+      "rel": "brand-kit/BRAND.md",
+      "filenames": ["BRAND.md"],
+      "required_for": ["brand-kit"],
+      "optional": false,
+      "description": "Color rules, typography, tone"
+    },
+    {
+      "id": "digest-md",
+      "kind": "md",
+      "rel": "brand-kit/DIGEST.md",
+      "filenames": ["DIGEST.md"],
+      "required_for": ["brand-kit"],
+      "optional": false,
+      "description": "Four-asset model + precedence"
+    },
+    {
+      "id": "official-template-md",
+      "kind": "md",
+      "rel": "brand-kit/OFFICIAL_TEMPLATE.md",
+      "filenames": ["OFFICIAL_TEMPLATE.md"],
+      "required_for": ["brand-kit"],
+      "optional": false,
+      "description": "Chart Pool layout digest"
+    },
+    {
+      "id": "structure-patterns-md",
+      "kind": "md",
+      "rel": "brand-kit/STRUCTURE_PATTERNS.md",
+      "filenames": ["STRUCTURE_PATTERNS.md"],
+      "required_for": ["brand-kit"],
+      "optional": false,
+      "description": "BC Chart Library + AntV structure maps"
+    },
+    {
+      "id": "icon-language-md",
+      "kind": "md",
+      "rel": "brand-kit/ICON_LANGUAGE.md",
+      "filenames": ["ICON_LANGUAGE.md"],
+      "required_for": ["brand-kit"],
+      "optional": false,
+      "description": "Radiology SVG outline + Chart Pool element language"
+    },
+    {
+      "id": "icon-examples",
+      "kind": "dir",
+      "rel": "brand-kit/icons/examples",
+      "filenames": ["examples"],
+      "required_for": ["brand-kit", "outline-icons"],
+      "optional": false,
+      "description": "Generic outline SVG exemplars"
+    },
+    {
+      "id": "assets-manifest",
+      "kind": "json",
+      "rel": "brand-kit/assets.manifest.json",
+      "filenames": ["assets.manifest.json"],
+      "required_for": ["asset-resolution"],
+      "optional": false,
+      "description": "This manifest"
+    }
+  ],
+  "aliases": {
+    "icon-language.potx": "icon-library-potx",
+    "ALL.AA.Illustrative_Elements.Icon_Library_Overview.potx": "icon-library-potx",
+    "color-system.pdf": "color-guide",
+    "official-template.pptx": "chart-pool",
+    "structured-graphics.pptx": "bc-chart-library",
+    "THEME.json": "theme",
+    "BRAND.md": "brand-md",
+    "DIGEST.md": "digest-md"
+  }
+}

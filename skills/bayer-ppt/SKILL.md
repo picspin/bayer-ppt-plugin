@@ -21,34 +21,49 @@ Resolve paths relative to the **plugin/repo root**, never hard-code a single mac
 | `${BAYER_PPT_ROOT}` | Directory containing this skill’s parent repo (the publishable package). Default: detect as the repo root that contains `brand-kit/` (walk up from this `SKILL.md` → `skills/bayer-ppt/` → repo root). Override with env `BAYER_PPT_ROOT` if needed. |
 | `${REPO_ROOT}` | Same as `${BAYER_PPT_ROOT}` for this package. |
 | Brand kit | `${REPO_ROOT}/brand-kit/` |
-| Proprietary sources | `${REPO_ROOT}/brand-assets/source/` |
+| Proprietary sources | Resolved via manifest (local `brand-assets/source/`, `BAYER_ASSETS_ROOT`, or `BAYER_KB_ROOT`) |
 | Outline icon examples | `${REPO_ROOT}/brand-kit/icons/examples/` |
 
-**Local Grok Bot install example** (not the publishable layout): `/home/box/tools/bayer-ppt/` may hold the same brand-kit + `source/` binaries on an internal box. Prefer `${REPO_ROOT}` when this plugin is installed via `npx skills add`.
+**Local Grok Bot install example** (not the publishable layout): `/home/box/tools/bayer-ppt/` may hold the same brand-kit + `source/` binaries on an internal box. Prefer `${REPO_ROOT}` when this plugin is installed via `npx skills add` or `./scripts/install.sh`.
+
+## Asset loading (required before design)
+
+Agents **MUST** resolve assets through the manifest + search order **before** designing slides:
+
+1. Read `${REPO_ROOT}/brand-kit/assets.manifest.json`.
+2. Run (or mentally apply) `python3 scripts/resolve_assets.py --check` / `--json` / `--get <id>`.
+3. Search order (first hit wins):
+   - `BAYER_ASSET_<ID>` (e.g. `BAYER_ASSET_ICON_LIBRARY_POTX`)
+   - `BAYER_ASSETS_ROOT/<rel>` or filename
+   - `BAYER_KB_ROOT/` recursive basename / alias match (synced drive, SharePoint, Notion export)
+   - `${REPO_ROOT}/<rel>`
+   - `BAYER_ASSET_PATH` (extra roots, `os.pathsep`-separated)
+4. If **proprietary** sources (POTX/PPTX/PDF) are missing: use **`brand-kit` specs only** (`THEME.json`, digests, pattern MDs, outline SVGs) and **say so** to the operator. Do not invent chrome that only exists on the Icon Library master.
+5. When `BAYER_KB_ROOT` is configured, **prefer KB** for binaries over inventing paths; still prefer an explicit `BAYER_ASSET_*` override when set.
+6. One-shot host setup: `./scripts/install.sh` (writes `.bayer-ppt.env` + `brand-assets/config.json`).
 
 ### Brand asset map
 
-| Path under `${REPO_ROOT}` | Use |
-|---------------------------|-----|
-| `brand-kit/THEME.json` | Palette, fonts, slide size, AntV palette, layout hints |
-| `brand-kit/BRAND.md` | Color rules, typography, tone |
-| `brand-kit/DIGEST.md` | Four-asset model + **precedence** |
-| `brand-kit/OFFICIAL_TEMPLATE.md` | Bayer 16:9 Chart Pool (Aug 2019) — layouts, diagrams, icons, elements |
-| `brand-kit/STRUCTURE_PATTERNS.md` | BC Chart Library + Official Template (2019) section → AntV maps |
-| `brand-kit/ICON_LANGUAGE.md` | Radiology SVG outline language + Chart Pool element language |
-| `brand-kit/icons/examples/` | Generic outline SVG exemplars (style only) |
-| `brand-assets/source/color-system.pdf` | Bayer Color Guide *(proprietary — drop-in)* |
-| `brand-assets/source/structured-graphics.pptx` | BC Chart Library *(proprietary — drop-in)* |
-| `brand-assets/source/official-template.pptx` | Chart Pool Updated *(proprietary — drop-in)* |
-| `brand-assets/source/icon-language.potx` | **Radiology Icon Library POTX** — primary slide-master backbone for Radiology/Centargo (`ALL.AA.Illustrative_Elements.Icon_Library_Overview`) |
+| Manifest id / path | Use |
+|--------------------|-----|
+| `theme` → `brand-kit/THEME.json` | Palette, fonts, slide size, AntV palette, layout hints |
+| `brand-md` … `icon-language-md` | BRAND / DIGEST / OFFICIAL_TEMPLATE / STRUCTURE_PATTERNS / ICON_LANGUAGE |
+| `icon-examples` → `brand-kit/icons/examples/` | Generic outline SVG exemplars (style only) |
+| `color-guide` | Bayer Color Guide PDF *(proprietary — optional)* |
+| `bc-chart-library` | BC Chart Library PPTX *(proprietary — optional)* |
+| `chart-pool` | Chart Pool Updated PPTX *(proprietary — optional)* |
+| `icon-library-potx` | **Radiology Icon Library POTX** — primary slide-master backbone for Radiology/Centargo |
 
 ### Working master for python-pptx
 
-POTX / PPTX masters often need a **content-type patched** working copy before `python-pptx` can open them reliably (e.g. rename/copy `icon-language.potx` → a `.pptx` working master and patch `[Content_Types].xml` / relationships as required by your tooling).
+```bash
+python3 scripts/resolve_assets.py --prepare-master
+# → ${REPO_ROOT}/exports/bayer-radiology-master.pptx (content-type patched if needed)
+```
 
-Suggested location (gitignored exports): `${REPO_ROOT}/exports/bayer-radiology-master.pptx` or a project-local path such as `./bayer-radiology-master.pptx`. Do not commit the binary master.
+Do not commit the binary master.
 
-**Before designing:** read `THEME.json`, `DIGEST.md` precedence, then the pattern docs that match the ask. Never invent HEX.
+**Before designing:** resolve assets → read `THEME.json`, `DIGEST.md` precedence → pattern docs that match the ask. Never invent HEX.
 
 ## Peer skills
 
@@ -57,7 +72,7 @@ Suggested location (gitignored exports): `${REPO_ROOT}/exports/bayer-radiology-m
 
 ## Slide master backbone (Radiology / Centargo)
 
-For Bayer Radiology and especially **Centargo** decks, do **not** build blank custom slides as the chrome. Start from `brand-assets/source/icon-language.potx` and use product layouts so Bayer logo + frame styles stay on the master:
+For Bayer Radiology and especially **Centargo** decks, do **not** build blank custom slides as the chrome. Resolve `icon-library-potx` (local or KB), prepare the working master if needed, and use product layouts so Bayer logo + frame styles stay on the master:
 
 | Role | Layout name (examples) |
 |------|------------------------|

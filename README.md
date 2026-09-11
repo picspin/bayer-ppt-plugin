@@ -11,36 +11,76 @@ Bundles:
 | `skills/ppt-master` | Thin wrapper → install peer `hugohe3/ppt-master` (not vendored) |
 | `skills/ppt-master-bridge` | When native PPTX is needed, ensure ppt-master + follow its SKILL.md |
 
-Derived specs live in `brand-kit/` (markdown + `THEME.json`). Proprietary POTX/PPTX/PDF binaries are **not** shipped — drop them into `brand-assets/source/`.
+Derived specs live in `brand-kit/` (markdown + `THEME.json` + `assets.manifest.json`). Proprietary POTX/PPTX/PDF binaries are **not** shipped — resolve from local disk or a knowledge-base path.
 
 ---
 
-## Install · 安装
+## Quick start · 一键安装
+
+```bash
+./scripts/install.sh
+# optional:
+./scripts/install.sh --assets-dir /path/to/binaries --kb-dir /path/to/kb \
+  --skip-ppt-master   # or omit to install peer
+# Windows: .\scripts\install.ps1  (Git Bash / WSL) or see script help
+```
+
+Flags:
+
+| Flag | Effect |
+|------|--------|
+| `--prefix DIR` | Venv / vendor prefix (default: `$REPO_ROOT/.venv`) |
+| `--skip-ppt-master` | Do not `npx skills add` / clone ppt-master |
+| `--skip-antv-runtime` | Skip `npm install @antv/infographic` (use CDN) |
+| `--assets-dir DIR` | Sets `BAYER_ASSETS_ROOT` + `brand-assets/config.json` |
+| `--kb-dir DIR` | Sets `BAYER_KB_ROOT` for recursive basename resolution |
+
+Install creates a `.venv`, installs `python-pptx` / `lxml` / `Pillow`, optionally vendors ppt-master + AntV runtime, then runs:
+
+```bash
+python3 scripts/resolve_assets.py --check --write-env
+```
+
+### Asset / KB environment variables
+
+```bash
+export BAYER_PPT_ROOT=/path/to/bayer-ppt-plugin
+export BAYER_ASSETS_ROOT=/path/to/local/binaries   # optional
+export BAYER_KB_ROOT=/path/to/kb-or-sharepoint     # optional
+# per-file override example:
+export BAYER_ASSET_ICON_LIBRARY_POTX=/secure/icon-language.potx
+# or:
+source "$BAYER_PPT_ROOT/.bayer-ppt.env"
+```
+
+Verify:
+
+```bash
+python3 scripts/resolve_assets.py --check
+python3 scripts/resolve_assets.py --json | head
+python3 scripts/resolve_assets.py --get icon-library-potx
+python3 scripts/resolve_assets.py --prepare-master
+```
+
+Manifest: [`brand-kit/assets.manifest.json`](brand-kit/assets.manifest.json). Details: [`brand-assets/README.md`](brand-assets/README.md).
+
+### Marketplace / skills add
 
 ```bash
 npx skills add YOUR_ORG/bayer-ppt-plugin
-# e.g. after publish: npx skills add <your-org>/bayer-ppt-plugin
 ```
 
-Claude Code / Cursor marketplace: this repo’s `.claude-plugin/marketplace.json` registers plugin **`bayer-ppt`** with the skills listed above.
+Claude Code / Cursor marketplace: `.claude-plugin/marketplace.json` registers plugin **`bayer-ppt`**.
 
 ### Peer dependencies · 对等依赖
 
-1. **ppt-master** (native PPTX routes) — **not** included (~900MB upstream):
-
-   ```bash
-   npx skills add hugohe3/ppt-master
-   ```
-
-   See [`deps/ppt-master.md`](deps/ppt-master.md).
-
-2. **Python venv** — `python-pptx` and ppt-master `requirements.txt` for compose/edit.
-
-3. **AntV Infographic CDN / runtime** — required when rendering `infographic-creator` output ([AntV Infographic](https://infographic.antv.vision/)).
+1. **ppt-master** — installed by `install.sh` (or `npx skills add hugohe3/ppt-master`). See [`deps/ppt-master.md`](deps/ppt-master.md).
+2. **Python venv** — created by `install.sh`.
+3. **AntV Infographic** — optional local runtime under `runtime/antv-infographic`, or CDN: [infographic.antv.vision](https://infographic.antv.vision/).
 
 ---
 
-## Private assets drop-in · 私有素材放置
+## Private assets · 私有素材
 
 ```text
 brand-assets/source/
@@ -50,9 +90,9 @@ brand-assets/source/
   color-system.pdf            # Color Guide
 ```
 
-Instructions: [`brand-assets/source/README.md`](brand-assets/source/README.md). These paths are gitignored.
+Or leave `source/` empty and resolve from `BAYER_KB_ROOT`. Instructions: [`brand-assets/source/README.md`](brand-assets/source/README.md).
 
-**Working master (python-pptx):** convert/patch `icon-language.potx` → a local `exports/bayer-radiology-master.pptx` (gitignored). Do not commit binaries.
+**Working master (python-pptx):** `resolve_assets.py --prepare-master` → `exports/bayer-radiology-master.pptx` (gitignored).
 
 ---
 
@@ -78,10 +118,12 @@ skills/bayer-ppt/SKILL.md
 skills/infographic-creator/SKILL.md
 skills/ppt-master/SKILL.md
 skills/ppt-master-bridge/SKILL.md
-brand-kit/          # derived specs + outline SVG examples
-brand-assets/source/# proprietary drop-in (gitignored)
+brand-kit/          # derived specs + assets.manifest.json + outline SVG examples
+brand-assets/       # drop-in + config (binaries gitignored)
+scripts/install.sh  # one-shot installer
+scripts/resolve_assets.py
 deps/ppt-master.md
-examples/centargo-hospital-visits/  # fictionalized sample brief
+examples/centargo-hospital-visits/
 AGENTS.md
 ```
 
@@ -106,19 +148,14 @@ Recommended: **private** repo (Bayer brand binaries stay in `brand-assets/source
 
 ```bash
 cd bayer-ppt-plugin
-git init
 git add .
-git commit -m "Initial Bayer-ppt plugin package"
+git commit -m "Bayer-ppt portable assets + install.sh"
 gh repo create YOUR_ORG/bayer-ppt-plugin --private --source=. --remote=origin --push
 ```
 
-Then install in any agent:
+Then on each host:
 
 ```bash
-npx skills add YOUR_ORG/bayer-ppt-plugin
-# peer
-npx skills add hugohe3/ppt-master
-pip install -r "$(dirname $(find ~/.agents -name svg_to_pptx.py 2>/dev/null | head -1))/../../requirements.txt"  # or follow deps/ppt-master.md
+./scripts/install.sh --assets-dir ./brand-assets/source --kb-dir /path/to/kb
+# or npx skills add YOUR_ORG/bayer-ppt-plugin
 ```
-
-Copy proprietary POTX/PPTX/PDF into `brand-assets/source/` on each machine that authors decks.

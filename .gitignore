@@ -33,3 +33,9 @@ Thumbs.db
 # Local agent scratch
 .tmp/
 .cache/
+
+# Local resolved env / install artifacts
+.bayer-ppt.env
+brand-assets/config.json
+vendor/
+runtime/
