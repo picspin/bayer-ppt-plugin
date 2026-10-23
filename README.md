@@ -159,3 +159,22 @@ Then on each host:
 ./scripts/install.sh --assets-dir ./brand-assets/source --kb-dir /path/to/kb
 # or npx skills add YOUR_ORG/bayer-ppt-plugin
 ```
+
+
+## Install in Claude Code (marketplace plugin)
+
+```bash
+claude plugin marketplace add picspin/bayer-ppt-plugin
+claude plugin install bayer-ppt@bayer-ppt
+```
+
+`install.sh` and `npx skills add` remain supported (see above).
+
+## v0.3.0 highlights
+- Global-thesis cover with exact placeholder fit (`fit_cover_image.py`, `COVER_IMG`)
+- Information-density lint, target 70–80%
+- Chart-intent → Chart Pool / BC Chart Library mapping (17 intents, ≤30% same pattern)
+- Mandatory `SRC_` source screenshots on cited slides
+- Academic-promotion mode + slide-face lint
+
+Proprietary Bayer templates (pptx/potx/pdf) are gitignored — drop them into `brand-assets/source/` locally. See CHANGELOG.md.

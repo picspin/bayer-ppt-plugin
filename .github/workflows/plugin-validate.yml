@@ -1,0 +1,40 @@
+name: plugin-validate
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate manifests (jq)
+        run: |
+          set -e
+          jq -e '.name and .owner.name and .metadata.version and (.plugins|length>0) and all(.plugins[]; .name and .source)' .claude-plugin/marketplace.json
+          jq -e '.name=="bayer-ppt" and .version and .description' .claude-plugin/plugin.json
+          v1=$(jq -r .version .claude-plugin/plugin.json); v2=$(jq -r .metadata.version .claude-plugin/marketplace.json); v3=$(jq -r .version package.json)
+          [ "$v1" = "$v2" ] && [ "$v1" = "$v3" ] || { echo "version mismatch $v1 $v2 $v3"; exit 1; }
+      - name: Check skill files
+        run: |
+          set -e
+          for f in skills/bayer-ppt/SKILL.md \
+            skills/bayer-ppt/references/academic-promotion-mode.md \
+            skills/bayer-ppt/references/chart-intent-map.md \
+            skills/bayer-ppt/references/cover-and-density.md \
+            skills/bayer-ppt/scripts/lint_slide_face.py \
+            skills/bayer-ppt/scripts/fit_cover_image.py \
+            skills/bayer-ppt/scripts/chart_pool_index.py; do
+            test -f "$f" || { echo "missing $f"; exit 1; }
+          done
+          for s in $(jq -r '.plugins[0].skills[]' .claude-plugin/marketplace.json); do test -f "$s/SKILL.md"; done
+          python3 -m py_compile skills/bayer-ppt/scripts/*.py
+      - name: No proprietary binaries committed
+        run: |
+          if git ls-files | grep -Ei '\.(pptx|potx|pdf)$' | grep -v '^docs/'; then echo "binary brand assets committed"; exit 1; fi
+      # Optional: Claude CLI validation needs no secrets for `plugin validate`; failure is non-blocking.
+      - name: claude plugin validate (best effort)
+        continue-on-error: true
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          claude plugin validate .

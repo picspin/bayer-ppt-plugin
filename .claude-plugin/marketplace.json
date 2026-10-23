@@ -6,12 +6,12 @@
   },
   "metadata": {
     "description": "Bayer brand presentation skills: brand kit, Centargo/Radiology master rules, AntV infographic creator, and ppt-master peer bridge",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
   "plugins": [
     {
       "name": "bayer-ppt",
-      "description": "Bayer / company deck skill with Color Guide, Chart Pool, BC Chart Library, and Radiology Icon Library master rules (Centargo layouts)",
+      "description": "Bayer deck skill: Color Guide, Chart Pool, BC Chart Library, Radiology Icon Library (Centargo), academic-promotion mode, cover fit, 70-80% density lint, chart-intent mapping, SRC_ citation screenshots",
       "source": "./",
       "strict": false,
       "skills": [
@@ -19,7 +19,8 @@
         "./skills/infographic-creator",
         "./skills/ppt-master",
         "./skills/ppt-master-bridge"
-      ]
+      ],
+      "version": "0.3.0"
     }
   ]
 }
