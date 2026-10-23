@@ -1,0 +1,611 @@
+name: Agenthub Registry Skill
+
+# Example workflow for Skills submission: registers/refreshes this repo's marketplace with
+# the Agent Registry on every push to `main`. Copy this file into your own
+# repo's .github/workflows/ (adjusting the `branches` trigger below if your
+# default branch isn't `main`) and set the two variables below.
+#
+# Requires:
+#   vars.AGENTHUB_API_URL   — base URL of the Agent Registry API
+#   secrets.AGENTHUB_TOKEN  — a PAT issued by the Agent Registry (ahub_...)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  AGENTHUB_API_URL: ${{ vars.AGENTHUB_API_URL }}
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify connectivity to Agent Registry
+        run: |
+          echo "Testing connectivity to Agent Registry..."
+          echo "URL: ${AGENTHUB_API_URL}/api/v1/utils/health-check/"
+
+          HTTP_STATUS=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
+            --connect-timeout 10 \
+            --max-time 30 \
+            "${AGENTHUB_API_URL}/api/v1/utils/health-check/")
+
+          echo "HTTP Status: $HTTP_STATUS"
+          cat /tmp/response.txt
+          echo ""
+
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            echo "✅ Agent Registry is reachable"
+          else
+            echo "❌ Agent Registry is NOT reachable (status: $HTTP_STATUS)"
+            echo "Runner IP: $(curl -s https://api.ipify.org || echo 'unknown')"
+            exit 1
+          fi
+
+  sync:
+    needs: health-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse marketplace and sync to Agent Registry
+        env:
+          AGENTHUB_TOKEN: ${{ secrets.AGENTHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # ─────────────────────────────────────────────────────────────────────
+          # Parse the marketplace repo structure and POST a full skill snapshot
+          # to the Agent Registry sync endpoint.
+          #
+          # Supports all valid Claude Code marketplace layouts:
+          #   1. Standard multi-plugin:  marketplace.json → plugins/<name>/skills/
+          #   2. Plugin at root:         marketplace.json with source: "./"
+          #   3. No plugin.json:         derive metadata from marketplace entry
+          #   4. metadata.pluginRoot:    custom base directory for plugins
+          #   5. No marketplace.json:    synthesize from plugin.json or bare skills/
+          #
+          # Requires: jq (pre-installed on GitHub runners)
+          # Auth: PAT token stored as AGENTHUB_TOKEN secret
+          # Spec: POST /api/v1/marketplace/sync
+          # ─────────────────────────────────────────────────────────────────────
+
+          MARKETPLACE_JSON=".claude-plugin/marketplace.json"
+          PLUGIN_JSON=".claude-plugin/plugin.json"
+
+          # ── Helper: extract a single frontmatter field from SKILL.md ──────────
+          # Handles both inline values and YAML multiline scalars (>, |, >-, |-)
+          extract_frontmatter_field() {
+            local file="$1" field="$2"
+            local value
+            value=$(awk -v field="$field" '
+              BEGIN { found = 0; result = "" }
+              /^---$/ { n++; next }
+              n >= 2 { exit }
+              n == 1 && found == 1 {
+                # Continuation lines for multiline scalar
+                if (/^[[:space:]]+/) {
+                  gsub(/^[[:space:]]+/, "")
+                  if (result != "") result = result " "
+                  result = result $0
+                  next
+                } else {
+                  # Non-indented line ends the multiline value
+                  print result
+                  exit
+                }
+              }
+              n == 1 && found == 0 {
+                # Match "field: value" or "field: >" / "field: |"
+                regex = "^" field ":"
+                if ($0 ~ regex) {
+                  sub(regex "[[:space:]]*", "")
+                  if ($0 ~ /^[>|][-]?[[:space:]]*$/) {
+                    # Multiline scalar — read continuation lines
+                    found = 1
+                    next
+                  } else {
+                    print
+                    exit
+                  }
+                }
+              }
+              END { if (found == 1 && result != "") print result }
+            ' "$file")
+            # Strip surrounding quotes if present
+            value="${value#\"}"
+            value="${value%\"}"
+            value="${value#\'}"
+            value="${value%\'}"
+            printf '%s' "$value"
+          }
+
+          # ── Helper: extract metadata block as JSON object ─────────────────────
+          extract_metadata_json() {
+            local file="$1"
+            local metadata
+            metadata=$(awk '/^---$/{n++; next} n==1{print} n>=2{exit}' "$file" \
+              | awk '/^metadata:/{found=1; next} found && /^  /{print; next} found{exit}' \
+              | sed 's/^  //' \
+              | awk -F': ' 'NF>=2{key=$1; $1=""; sub(/^ /, "", $0); printf "\"%s\": \"%s\",", key, $0}' \
+              | sed 's/,$//')
+            if [ -z "$metadata" ]; then
+              echo "{}"
+            else
+              echo "{${metadata}}"
+            fi
+          }
+
+          # ── Helper: process a single skill SKILL.md into SKILLS_FILE ──────────
+          process_skill() {
+            local skill_md="$1" plugin_dir="$2"
+            local skill_dir skill_path_rel skill_name skill_desc skill_license skill_compat skill_metadata
+
+            skill_dir=$(dirname "$skill_md")
+            # Compute relative path from plugin root
+            if [ "$plugin_dir" = "." ]; then
+              skill_path_rel="$skill_dir"
+              [ "$skill_path_rel" = "." ] && skill_path_rel=$(basename "$skill_dir")
+            else
+              skill_path_rel="${skill_dir#$plugin_dir/}"
+            fi
+
+            skill_name=$(extract_frontmatter_field "$skill_md" "name")
+            skill_desc=$(extract_frontmatter_field "$skill_md" "description")
+            skill_license=$(extract_frontmatter_field "$skill_md" "license")
+            skill_compat=$(extract_frontmatter_field "$skill_md" "compatibility")
+            skill_metadata=$(extract_metadata_json "$skill_md")
+
+            # Skip skills without required fields
+            if [ -z "$skill_name" ] || [ -z "$skill_desc" ]; then
+              echo "    ⚠️  Skipping $(basename "$skill_dir") — missing name or description"
+              return
+            fi
+
+            echo "    📄 $skill_name"
+
+            # Build file_structure
+            local file_struct_file
+            file_struct_file=$(mktemp)
+            echo "{}" > "$file_struct_file"
+            while IFS= read -r entry; do
+              local rel_path="${entry#$skill_dir/}"
+              jq --arg p "$rel_path" '. + {($p): null}' "$file_struct_file" \
+                > "${file_struct_file}.tmp" && mv "${file_struct_file}.tmp" "$file_struct_file"
+            done < <(find "$skill_dir" -maxdepth 2 -type f | sort)
+
+            # Append skill (--rawfile handles multi-line content safely)
+            jq \
+              --arg name "$skill_name" \
+              --arg desc "$skill_desc" \
+              --arg license "$skill_license" \
+              --arg compat "$skill_compat" \
+              --argjson metadata "$skill_metadata" \
+              --rawfile content "$skill_md" \
+              --slurpfile file_structure "$file_struct_file" \
+              --arg skill_path "$skill_path_rel" \
+              '. + [{
+                name: $name,
+                description: $desc,
+                license: (if $license == "" then null else $license end),
+                compatibility: (if $compat == "" then null else $compat end),
+                metadata: $metadata,
+                skill_content: $content,
+                file_structure: $file_structure[0],
+                skill_path: $skill_path
+              }]' "$SKILLS_FILE" > "${SKILLS_FILE}.tmp" && mv "${SKILLS_FILE}.tmp" "$SKILLS_FILE"
+
+            rm -f "$file_struct_file"
+          }
+
+          # ── Helper: find skills within a plugin directory ─────────────────────
+          process_skills_in_plugin() {
+            local plugin_dir="$1" skills_dir_override="$2"
+            local skills_dir
+
+            # Determine skills directory
+            if [ -n "$skills_dir_override" ] && [ "$skills_dir_override" != "null" ]; then
+              skills_dir="${plugin_dir}/${skills_dir_override#./}"
+            elif [ -d "${plugin_dir}/skills" ]; then
+              skills_dir="${plugin_dir}/skills"
+            else
+              skills_dir=""
+            fi
+
+            # Search for SKILL.md in skills directory
+            if [ -n "$skills_dir" ] && [ -d "$skills_dir" ]; then
+              while IFS= read -r skill_md; do
+                process_skill "$skill_md" "$plugin_dir"
+              done < <(find "$skills_dir" -name "SKILL.md" -type f | sort)
+            fi
+
+            # Fallback: single SKILL.md at plugin root (Layout 3)
+            if [ "$(jq 'length' "$SKILLS_FILE")" -eq 0 ] && [ -f "${plugin_dir}/SKILL.md" ]; then
+              process_skill "${plugin_dir}/SKILL.md" "$(dirname "$plugin_dir")"
+            fi
+          }
+
+          # ═══════════════════════════════════════════════════════════════════════
+          # MAIN: Determine repo layout and build payload
+          # ═══════════════════════════════════════════════════════════════════════
+
+          REPO_URL="https://github.com/${GITHUB_REPOSITORY}"
+          REPO_REF="${GITHUB_REF_NAME}"
+
+          if [ -f "$MARKETPLACE_JSON" ]; then
+            # ═══ Cases 1-4: marketplace.json exists ═══════════════════════════════
+            echo "📦 Found marketplace.json"
+
+            MARKETPLACE_NAME=$(jq -r '.name' "$MARKETPLACE_JSON")
+            MARKETPLACE_DESC=$(jq -r '.description // ""' "$MARKETPLACE_JSON")
+            OWNER_NAME=$(jq -r '.owner.name' "$MARKETPLACE_JSON")
+            OWNER_EMAIL=$(jq -r '.owner.email // ""' "$MARKETPLACE_JSON")
+            PLUGIN_ROOT=$(jq -r '.metadata.pluginRoot // ""' "$MARKETPLACE_JSON")
+
+            echo "  Marketplace: $MARKETPLACE_NAME"
+            echo "  Owner: $OWNER_NAME <$OWNER_EMAIL>"
+            [ -n "$PLUGIN_ROOT" ] && echo "  Plugin root: $PLUGIN_ROOT"
+
+          elif [ -f "$PLUGIN_JSON" ]; then
+            # ═══ Case 5a: plugin.json only (no marketplace) ══════════════════════
+            echo "📦 No marketplace.json — synthesizing from plugin.json"
+
+            PLUGIN_NAME_RAW=$(jq -r '.name // ""' "$PLUGIN_JSON")
+            MARKETPLACE_NAME="${PLUGIN_NAME_RAW:-$(basename "$(pwd)")}-marketplace"
+            MARKETPLACE_DESC=$(jq -r '.description // ""' "$PLUGIN_JSON")
+            OWNER_NAME=$(jq -r '.author.name // "Unknown"' "$PLUGIN_JSON")
+            OWNER_EMAIL=$(jq -r '.author.email // ""' "$PLUGIN_JSON")
+            PLUGIN_ROOT=""
+
+            echo "  Synthesized marketplace: $MARKETPLACE_NAME"
+            echo "  Owner: $OWNER_NAME"
+
+          elif find . -maxdepth 3 -name "SKILL.md" -type f | head -1 | grep -q .; then
+            # ═══ Case 5b: bare skills, no manifests ══════════════════════════════
+            echo "📦 No manifests found — synthesizing from bare skills"
+
+            REPO_BASENAME=$(basename "${GITHUB_REPOSITORY}")
+            MARKETPLACE_NAME="${REPO_BASENAME}-marketplace"
+            MARKETPLACE_DESC="Auto-discovered skills from ${GITHUB_REPOSITORY}"
+            OWNER_NAME="${GITHUB_REPOSITORY_OWNER:-Unknown}"
+            OWNER_EMAIL=""
+            PLUGIN_ROOT=""
+
+            echo "  Synthesized marketplace: $MARKETPLACE_NAME"
+
+          else
+            echo "❌ No skills found in this repository"
+            echo "   Expected: .claude-plugin/marketplace.json, .claude-plugin/plugin.json, or SKILL.md files"
+            exit 1
+          fi
+
+          # ── Build plugins array ───────────────────────────────────────────────
+          PLUGINS_FILE=$(mktemp)
+          echo "[]" > "$PLUGINS_FILE"
+
+          if [ -f "$MARKETPLACE_JSON" ]; then
+            # ── Parse plugin entries from marketplace.json ───────────────────────
+            PLUGIN_COUNT=$(jq '.plugins | length' "$MARKETPLACE_JSON")
+            echo ""
+            echo "🔍 Found $PLUGIN_COUNT plugin(s) in marketplace"
+
+            for ((i=0; i<PLUGIN_COUNT; i++)); do
+              # Check if source is a local string path
+              SOURCE_TYPE=$(jq -r ".plugins[$i].source | type" "$MARKETPLACE_JSON")
+              if [ "$SOURCE_TYPE" != "string" ]; then
+                echo "  ⏭️  Skipping remote plugin (object source)"
+                continue
+              fi
+
+              PLUGIN_SOURCE=$(jq -r ".plugins[$i].source" "$MARKETPLACE_JSON")
+
+              # ── Resolve source per spec (docs/en/plugin-marketplaces#relative-paths):
+              # a "./" path resolves as-is and ignores pluginRoot; pluginRoot only
+              # applies to a bare name (no "/" anywhere in the source).
+              if [[ "$PLUGIN_SOURCE" == ./* ]] || [ "$PLUGIN_SOURCE" = "." ]; then
+                PLUGIN_DIR="${PLUGIN_SOURCE#./}"
+              elif [[ "$PLUGIN_SOURCE" != */* ]] && [ -n "$PLUGIN_ROOT" ]; then
+                # Strip a leading "./" first so a root of "./" (repo root) doesn't
+                # leave an empty base — that would turn the unconditional "/"
+                # separator below into a leading slash, resolving to an absolute
+                # path like "/demo" instead of the intended repo-relative "demo".
+                PLUGIN_ROOT_STRIPPED="${PLUGIN_ROOT#./}"
+                if [ -z "$PLUGIN_ROOT_STRIPPED" ] || [ "$PLUGIN_ROOT_STRIPPED" = "/" ]; then
+                  PLUGIN_DIR="$PLUGIN_SOURCE"
+                else
+                  PLUGIN_DIR="${PLUGIN_ROOT_STRIPPED}/${PLUGIN_SOURCE}"
+                fi
+              else
+                echo "  ⏭️  Skipping non-local plugin source: $PLUGIN_SOURCE"
+                continue
+              fi
+
+              # ── Case 2: source "./" or "." → plugin is repo root ────────────
+              if [ "$PLUGIN_DIR" = "." ] || [ "$PLUGIN_DIR" = "" ] || [ "$PLUGIN_DIR" = "/" ]; then
+                PLUGIN_DIR="."
+              fi
+
+              # A bad resolved path must not fall through silently — that produces an
+              # empty-skills payload the registry still accepts as a "successful" sync.
+              if [ "$PLUGIN_DIR" != "." ] && [ ! -d "$PLUGIN_DIR" ]; then
+                echo "  ❌ Resolved plugin directory does not exist: $PLUGIN_DIR (from source: $PLUGIN_SOURCE)"
+                exit 1
+              fi
+
+              # Locate plugin.json (for root plugins, check .claude-plugin/plugin.json)
+              if [ "$PLUGIN_DIR" = "." ]; then
+                LOCAL_PLUGIN_JSON="$PLUGIN_JSON"
+              else
+                LOCAL_PLUGIN_JSON="${PLUGIN_DIR}/.claude-plugin/plugin.json"
+              fi
+
+              # ── Case 3: No plugin.json → derive from marketplace entry ──────
+              if [ -f "$LOCAL_PLUGIN_JSON" ]; then
+                P_NAME=$(jq -r '.name' "$LOCAL_PLUGIN_JSON")
+                P_DESC=$(jq -r '.description // ""' "$LOCAL_PLUGIN_JSON")
+                P_VERSION=$(jq -r '.version // ""' "$LOCAL_PLUGIN_JSON")
+                P_AUTHOR_NAME=$(jq -r '.author.name // ""' "$LOCAL_PLUGIN_JSON")
+                P_AUTHOR_EMAIL=$(jq -r '.author.email // ""' "$LOCAL_PLUGIN_JSON")
+                P_LICENSE=$(jq -r '.license // ""' "$LOCAL_PLUGIN_JSON")
+                P_KEYWORDS=$(jq '.keywords // []' "$LOCAL_PLUGIN_JSON")
+                SKILLS_DIR_OVERRIDE=$(jq -r '.skills // ""' "$LOCAL_PLUGIN_JSON")
+                if echo "$SKILLS_DIR_OVERRIDE" | jq -e 'type == "array"' >/dev/null 2>&1; then
+                  SKILLS_DIR_OVERRIDE=$(echo "$SKILLS_DIR_OVERRIDE" | jq -r '.[0] // ""')
+                fi
+              else
+                echo "    ℹ️  No plugin.json — using marketplace entry"
+                P_NAME=$(jq -r ".plugins[$i].name // \"\"" "$MARKETPLACE_JSON")
+                P_DESC=$(jq -r ".plugins[$i].description // \"\"" "$MARKETPLACE_JSON")
+                P_VERSION=$(jq -r ".plugins[$i].version // \"\"" "$MARKETPLACE_JSON")
+                P_AUTHOR_NAME="$OWNER_NAME"
+                P_AUTHOR_EMAIL="$OWNER_EMAIL"
+                P_LICENSE=$(jq -r ".plugins[$i].license // \"\"" "$MARKETPLACE_JSON")
+                P_KEYWORDS=$(jq ".plugins[$i].keywords // []" "$MARKETPLACE_JSON")
+                SKILLS_DIR_OVERRIDE=""
+
+                # Check marketplace entry for explicit skills paths
+                ENTRY_SKILLS_TYPE=$(jq -r ".plugins[$i].skills | type" "$MARKETPLACE_JSON" 2>/dev/null || echo "null")
+                if [ "$ENTRY_SKILLS_TYPE" = "array" ]; then
+                  SKILLS_DIR_OVERRIDE=$(jq -r ".plugins[$i].skills[0] // \"\"" "$MARKETPLACE_JSON")
+                elif [ "$ENTRY_SKILLS_TYPE" = "string" ]; then
+                  SKILLS_DIR_OVERRIDE=$(jq -r ".plugins[$i].skills // \"\"" "$MARKETPLACE_JSON")
+                fi
+              fi
+
+              # Fallback: derive name from directory
+              if [ -z "$P_NAME" ] || [ "$P_NAME" = "null" ]; then
+                if [ "$PLUGIN_DIR" = "." ]; then
+                  P_NAME=$(basename "$(pwd)")
+                else
+                  P_NAME=$(basename "$PLUGIN_DIR")
+                fi
+              fi
+
+              # plugin_path for the payload (null for root plugins)
+              if [ "$PLUGIN_DIR" = "." ]; then
+                P_PATH=""
+              else
+                P_PATH="$PLUGIN_DIR"
+              fi
+
+              echo ""
+              echo "  📁 Plugin: $P_NAME (${P_PATH:-.})"
+
+              # Process skills
+              SKILLS_FILE=$(mktemp)
+              echo "[]" > "$SKILLS_FILE"
+              process_skills_in_plugin "$PLUGIN_DIR" "$SKILLS_DIR_OVERRIDE"
+
+              SKILL_COUNT=$(jq 'length' "$SKILLS_FILE")
+              echo "    → $SKILL_COUNT skill(s)"
+
+              # Append plugin
+              jq \
+                --arg name "$P_NAME" \
+                --arg desc "$P_DESC" \
+                --arg version "$P_VERSION" \
+                --arg author_name "$P_AUTHOR_NAME" \
+                --arg author_email "$P_AUTHOR_EMAIL" \
+                --arg license "$P_LICENSE" \
+                --argjson keywords "$P_KEYWORDS" \
+                --arg plugin_path "$P_PATH" \
+                --slurpfile skills "$SKILLS_FILE" \
+                '. + [{
+                  name: $name,
+                  description: (if $desc == "" then null else $desc end),
+                  version: (if $version == "" then null else $version end),
+                  author_name: (if $author_name == "" then null else $author_name end),
+                  author_email: (if $author_email == "" then null else $author_email end),
+                  license: (if $license == "" then null else $license end),
+                  keywords: $keywords,
+                  plugin_path: (if $plugin_path == "" then null else $plugin_path end),
+                  skills: $skills[0]
+                }]' "$PLUGINS_FILE" > "${PLUGINS_FILE}.tmp" && mv "${PLUGINS_FILE}.tmp" "$PLUGINS_FILE"
+
+              rm -f "$SKILLS_FILE"
+            done
+
+          elif [ -f "$PLUGIN_JSON" ]; then
+            # ── Case 5a: Single plugin from plugin.json ─────────────────────────
+            echo ""
+            echo "🔍 Processing single-plugin repo"
+
+            P_NAME=$(jq -r '.name // ""' "$PLUGIN_JSON")
+            P_DESC=$(jq -r '.description // ""' "$PLUGIN_JSON")
+            P_VERSION=$(jq -r '.version // ""' "$PLUGIN_JSON")
+            P_AUTHOR_NAME=$(jq -r '.author.name // ""' "$PLUGIN_JSON")
+            P_AUTHOR_EMAIL=$(jq -r '.author.email // ""' "$PLUGIN_JSON")
+            P_LICENSE=$(jq -r '.license // ""' "$PLUGIN_JSON")
+            P_KEYWORDS=$(jq '.keywords // []' "$PLUGIN_JSON")
+            SKILLS_DIR_OVERRIDE=$(jq -r '.skills // ""' "$PLUGIN_JSON")
+            if echo "$SKILLS_DIR_OVERRIDE" | jq -e 'type == "array"' >/dev/null 2>&1; then
+              SKILLS_DIR_OVERRIDE=$(echo "$SKILLS_DIR_OVERRIDE" | jq -r '.[0] // ""')
+            fi
+            [ -z "$P_NAME" ] || [ "$P_NAME" = "null" ] && P_NAME=$(basename "$(pwd)")
+
+            echo "  📁 Plugin: $P_NAME (.)"
+
+            SKILLS_FILE=$(mktemp)
+            echo "[]" > "$SKILLS_FILE"
+            process_skills_in_plugin "." "$SKILLS_DIR_OVERRIDE"
+
+            SKILL_COUNT=$(jq 'length' "$SKILLS_FILE")
+            echo "    → $SKILL_COUNT skill(s)"
+
+            jq \
+              --arg name "$P_NAME" \
+              --arg desc "$P_DESC" \
+              --arg version "$P_VERSION" \
+              --arg author_name "$P_AUTHOR_NAME" \
+              --arg author_email "$P_AUTHOR_EMAIL" \
+              --arg license "$P_LICENSE" \
+              --argjson keywords "$P_KEYWORDS" \
+              --slurpfile skills "$SKILLS_FILE" \
+              '. + [{
+                name: $name,
+                description: (if $desc == "" then null else $desc end),
+                version: (if $version == "" then null else $version end),
+                author_name: (if $author_name == "" then null else $author_name end),
+                author_email: (if $author_email == "" then null else $author_email end),
+                license: (if $license == "" then null else $license end),
+                keywords: $keywords,
+                plugin_path: null,
+                skills: $skills[0]
+              }]' "$PLUGINS_FILE" > "${PLUGINS_FILE}.tmp" && mv "${PLUGINS_FILE}.tmp" "$PLUGINS_FILE"
+
+            rm -f "$SKILLS_FILE"
+
+          else
+            # ── Case 5b: Auto-discover bare skills ──────────────────────────────
+            echo ""
+            echo "🔍 Auto-discovering skills (no manifests)"
+
+            P_NAME=$(basename "${GITHUB_REPOSITORY}")
+            echo "  📁 Synthetic plugin: $P_NAME (.)"
+
+            SKILLS_FILE=$(mktemp)
+            echo "[]" > "$SKILLS_FILE"
+
+            for search_dir in "skills" "." ".claude/skills" ".agents/skills"; do
+              if [ -d "$search_dir" ]; then
+                while IFS= read -r skill_md; do
+                  process_skill "$skill_md" "."
+                done < <(find "$search_dir" -name "SKILL.md" -type f -maxdepth 3 | sort)
+              fi
+            done
+
+            SKILL_COUNT=$(jq 'length' "$SKILLS_FILE")
+            echo "    → $SKILL_COUNT skill(s)"
+
+            jq \
+              --arg name "$P_NAME" \
+              --slurpfile skills "$SKILLS_FILE" \
+              '. + [{
+                name: $name,
+                description: null,
+                version: null,
+                author_name: null,
+                author_email: null,
+                license: null,
+                keywords: [],
+                plugin_path: null,
+                skills: $skills[0]
+              }]' "$PLUGINS_FILE" > "${PLUGINS_FILE}.tmp" && mv "${PLUGINS_FILE}.tmp" "$PLUGINS_FILE"
+
+            rm -f "$SKILLS_FILE"
+          fi
+
+          # ── Assemble final payload ────────────────────────────────────────────
+          PAYLOAD_FILE=$(mktemp)
+          jq -n \
+            --arg repo_url "$REPO_URL" \
+            --arg repo_ref "$REPO_REF" \
+            --arg mp_name "$MARKETPLACE_NAME" \
+            --arg mp_desc "$MARKETPLACE_DESC" \
+            --arg owner_name "$OWNER_NAME" \
+            --arg owner_email "$OWNER_EMAIL" \
+            --slurpfile plugins "$PLUGINS_FILE" \
+            '{
+              repo_url: $repo_url,
+              repo_ref: $repo_ref,
+              marketplace: {
+                name: $mp_name,
+                description: (if $mp_desc == "" then null else $mp_desc end),
+                version: null,
+                owner_name: $owner_name,
+                owner_email: (if $owner_email == "" then null else $owner_email end)
+              },
+              plugins: $plugins[0]
+            }' > "$PAYLOAD_FILE"
+
+          rm -f "$PLUGINS_FILE"
+
+          # ── Summary ───────────────────────────────────────────────────────────
+          TOTAL_SKILLS=$(jq '[.plugins[].skills | length] | add // 0' "$PAYLOAD_FILE")
+          TOTAL_PLUGINS=$(jq '.plugins | length' "$PAYLOAD_FILE")
+          PAYLOAD_SIZE=$(wc -c < "$PAYLOAD_FILE" | tr -d ' ')
+
+          echo ""
+          echo "════════════════════════════════════════════════════════"
+          echo "📋 Sync Payload Summary"
+          echo "  Marketplace: $MARKETPLACE_NAME"
+          echo "  Plugins:     $TOTAL_PLUGINS"
+          echo "  Skills:      $TOTAL_SKILLS"
+          echo "  Payload:     ${PAYLOAD_SIZE} bytes"
+          echo "════════════════════════════════════════════════════════"
+
+          if [ "$TOTAL_SKILLS" -eq 0 ]; then
+            echo ""
+            echo "⚠️  No skills found — sending empty payload (will deprecate any existing skills)"
+          fi
+
+          # ── POST to Agent Registry ────────────────────────────────────────────
+          echo ""
+          echo "🚀 Syncing to Agent Registry..."
+
+          HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" \
+            --connect-timeout 30 \
+            --max-time 120 \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${AGENTHUB_TOKEN}" \
+            -d @"$PAYLOAD_FILE" \
+            "${AGENTHUB_API_URL}/api/v1/marketplace/sync")
+
+          rm -f "$PAYLOAD_FILE"
+
+          HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed '$d')
+          HTTP_STATUS=$(echo "$HTTP_RESPONSE" | tail -1)
+
+          echo "HTTP Status: $HTTP_STATUS"
+
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            echo ""
+            echo "✅ Sync successful!"
+            echo "$HTTP_BODY" | jq .
+            echo ""
+            CREATED=$(echo "$HTTP_BODY" | jq -r '.summary.created // 0')
+            UPDATED=$(echo "$HTTP_BODY" | jq -r '.summary.updated // 0')
+            UNCHANGED=$(echo "$HTTP_BODY" | jq -r '.summary.unchanged // 0')
+            DEPRECATED=$(echo "$HTTP_BODY" | jq -r '.summary.deprecated // 0')
+            echo "  Created:    $CREATED"
+            echo "  Updated:    $UPDATED"
+            echo "  Unchanged:  $UNCHANGED"
+            echo "  Deprecated: $DEPRECATED"
+          elif [ "$HTTP_STATUS" -eq 401 ]; then
+            echo ""
+            echo "❌ Authentication failed — check AGENTHUB_TOKEN secret"
+            echo "$HTTP_BODY" | jq . 2>/dev/null || echo "$HTTP_BODY"
+            exit 1
+          elif [ "$HTTP_STATUS" -eq 422 ]; then
+            echo ""
+            echo "❌ Validation error — fix skill data and re-run"
+            echo "$HTTP_BODY" | jq . 2>/dev/null || echo "$HTTP_BODY"
+            exit 1
+          else
+            echo ""
+            echo "❌ Unexpected response (HTTP $HTTP_STATUS)"
+            echo "$HTTP_BODY" | jq . 2>/dev/null || echo "$HTTP_BODY"
+            exit 1
+          fi
