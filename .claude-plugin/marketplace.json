@@ -2,7 +2,8 @@
   "$schema": "https://code.claude.com/schemas/marketplace.json",
   "name": "bayer-ppt",
   "owner": {
-    "name": "Bayer-ppt contributors"
+    "name": "Xiaolei Zhu",
+    "email": "xiaolei.zhu@bayer.com"
   },
   "metadata": {
     "description": "Bayer brand presentation skills: brand kit, Centargo/Radiology master rules, AntV infographic creator, and ppt-master peer bridge",
