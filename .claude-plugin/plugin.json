@@ -3,10 +3,10 @@
   "version": "0.3.0",
   "description": "Bayer-branded PPT skills: Chart Pool / BC Chart Library / Centargo Radiology masters, academic-promotion mode, global-thesis cover with exact placeholder fit, 70-80% information-density lint, chart-intent to template mapping, and mandatory SRC_ citation screenshots.",
   "author": { 
-    "name": "Xiaolei Zhu"，
+    "name": "Xiaolei Zhu",
     "email": "xiaolei.zhu@bayer.com"
   },
   "repository": "https://github.com/picspin/bayer-ppt-plugin",
-  "keywords": ["bayer", "pptx", "powerpoint", "centargo", "skills"]，
+  "keywords": ["bayer", "pptx", "powerpoint", "centargo", "skills"],
   "skills": "./skills"
 }
